@@ -46,7 +46,8 @@ router.post("/verify-identity", verificationUpload, async (req, res) => {
       text: `
 Act as a strict Identity Verification Officer specializing in ETHIOPIAN documents.
       User claims ID Type: ${idType}. Today's date is December 2025 (Gregorian).
-
+        
+      IMPORTANT DETAILL: DO NOT REJECT THE VERIFICATION BECAUSE OF ANOTHER FLAG.
       REGIONAL KNOWLEDGE BASE:
       1. FLAGS: If you see a Red-White-Black tricolor, it is likely an Oromia regional flag or a variation of an Ethiopian regional ID. It is NOT the Iraqi flag.
       2. SYMBOLS: A tree (Sycamore/Odaa) on a flag confirms it is an Oromia Regional ID.
@@ -61,7 +62,9 @@ Act as a strict Identity Verification Officer specializing in ETHIOPIAN document
       1. Analyze the ID. Check for "Date of Birth" and "Expiry Date". Convert E.C. to G.C. to verify if the user is an adult (>18).
       2. Match the face in the Selfie with the photo on the ID.
       3. Check for forgery or digital manipulation.
+      
 
+    
       Return ONLY JSON:
       { 
         "approved": boolean, 

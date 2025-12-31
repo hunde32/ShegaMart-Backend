@@ -2,12 +2,15 @@ require("dotenv").config();
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
-const verifyRoutes = require("./routes/verify"); // We will create this next
+
+// Import Routes
+const verifyRoutes = require("./routes/verify"); // Your existing verification file
+const authRoutes = require("./routes/auth"); // New Auth
+const productRoutes = require("./routes/product"); // New Product AI
 
 const app = express();
 
-// Middleware
-app.use(cors()); // Allows your frontend to talk to this backend
+app.use(cors());
 app.use(express.json());
 
 // Database Connection
@@ -16,8 +19,10 @@ mongoose
   .then(() => console.log("✅ MongoDB Connected"))
   .catch((err) => console.error("❌ MongoDB Connection Error:", err));
 
-// Routes
-app.use("/api", verifyRoutes);
+// Register Routes
+app.use("/api/verify", verifyRoutes); // Note: Changed to /api/verify to keep it clean (Update your frontend fetch url!)
+app.use("/api/auth", authRoutes);
+app.use("/api/products", productRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
