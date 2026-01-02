@@ -3,11 +3,20 @@ const router = express.Router();
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
-// const nodemailer = require("nodemailer"); // Uncomment if using real email
+const nodemailer = require("nodemailer");
 
-// --- CONFIG ---
+// --- CONFIGURATION ---
 const BETTER_AUTH_SECRET =
-  process.env.BETTER_AUTH_SECRET || "ER39a0hUG4KaSTzNKJP6pLsHBnydtzNU";
+  process.env.BETTER_AUTH_SECRET || "pJdsPPPn4DFx4frQfG28fiUXwB6LnIuG";
+
+// --- NODEMAILER CONFIGURATION ---
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: "shegamart.com@gmail.com",
+    pass: "vsem jmoo xeez jwqr",
+  },
+});
 
 // Helper: DJB2 Hash logic for Shega ID
 const generateShegaId = (firstName, lastName, doorNumber) => {
@@ -22,7 +31,7 @@ const generateShegaId = (firstName, lastName, doorNumber) => {
   return Math.abs(hash).toString();
 };
 
-// --- GOOGLE LOGIN ---
+// --- GOOGLE LOGIN (Trusted - Auto Verified) ---
 router.post("/google", async (req, res) => {
   try {
     const { token } = req.body;
@@ -52,10 +61,10 @@ router.post("/google", async (req, res) => {
         googleId: sub,
         role: "BUYER",
         isVerified: false,
-        isEmailVerified: true, // Google emails are trusted automatically
+        isEmailVerified: true, // Google users are trusted automatically
         shegaId: generatedShegaId,
         location: { lat: 9.005401, lng: 38.763611 },
-        addressDetails: { type: "house", number: "" }, // Explicitly empty
+        addressDetails: { type: "house", number: "" },
       });
       await user.save();
     } else {
@@ -66,11 +75,9 @@ router.post("/google", async (req, res) => {
       }
     }
 
-    const appToken = jwt.sign(
-      { id: user._id },
-      process.env.JWT_SECRET || "secret_key",
-      { expiresIn: "7d" },
-    );
+    const appToken = jwt.sign({ id: user._id }, BETTER_AUTH_SECRET, {
+      expiresIn: "7d",
+    });
     const { password: _, ...userData } = user._doc;
     res.json({ token: appToken, user: userData });
   } catch (err) {
@@ -85,7 +92,7 @@ router.get("/me", async (req, res) => {
     const token = req.headers.authorization?.split(" ")[1];
     if (!token) return res.status(401).json({ message: "No token provided" });
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || "secret_key");
+    const decoded = jwt.verify(token, BETTER_AUTH_SECRET);
     const user = await User.findById(decoded.id).select("-password");
     if (!user) return res.status(404).json({ message: "User not found" });
     res.json(user);
@@ -94,16 +101,15 @@ router.get("/me", async (req, res) => {
   }
 });
 
-// --- NEW: UPDATE PROFILE ROUTE ---
+// --- UPDATE PROFILE ROUTE ---
 router.put("/update-profile", async (req, res) => {
   try {
     const token = req.headers.authorization?.split(" ")[1];
     if (!token) return res.status(401).json({ message: "No token" });
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || "secret_key");
+    const decoded = jwt.verify(token, BETTER_AUTH_SECRET);
 
     const { phone, addressDetails, firstName, lastName } = req.body;
 
-    // Build update object
     const updateData = {};
     if (phone) updateData.phone = phone;
     if (firstName) updateData.firstName = firstName;
@@ -125,12 +131,12 @@ router.put("/update-profile", async (req, res) => {
   }
 });
 
-// --- NEW: SEND EMAIL VERIFICATION CODE ---
+// --- SEND REAL VERIFICATION EMAIL (Using Nodemailer) ---
 router.post("/send-verification", async (req, res) => {
   try {
     const token = req.headers.authorization?.split(" ")[1];
     if (!token) return res.status(401).json({ message: "No token" });
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || "secret_key");
+    const decoded = jwt.verify(token, BETTER_AUTH_SECRET);
 
     const user = await User.findById(decoded.id);
     if (!user) return res.status(404).json({ message: "User not found" });
@@ -138,37 +144,59 @@ router.post("/send-verification", async (req, res) => {
     if (user.isEmailVerified)
       return res.status(400).json({ message: "Already verified" });
 
+    // Double check: if user is Google user, they shouldn't verify
+    if (user.googleId) {
+      user.isEmailVerified = true;
+      await user.save();
+      return res
+        .status(400)
+        .json({ message: "Google accounts are automatically verified." });
+    }
+
     // Generate 6 digit code
     const code = Math.floor(100000 + Math.random() * 900000).toString();
 
+    // Save to DB
     user.emailVerificationToken = code;
     user.emailVerificationExpires = Date.now() + 3600000; // 1 hour
     await user.save();
 
-    // MOCK EMAIL SENDING (Check your server console)
-    console.log(
-      `[Better Auth Mock] Code for ${user.email}: ${code} (Secret: ${BETTER_AUTH_SECRET.substring(0, 5)}...)`,
-    );
+    // Send Email via Nodemailer
+    const mailOptions = {
+      from: '"ShegaMart Security" <shegamart.com@gmail.com>',
+      to: user.email,
+      subject: "Your Verification Code - ShegaMart",
+      html: `
+        <div style="font-family: sans-serif; padding: 20px; text-align: center;">
+          <h2 style="color: #333;">Welcome to ShegaMart!</h2>
+          <p>Please confirm your email address to unlock full features.</p>
+          <div style="margin: 30px 0;">
+            <span style="font-size: 32px; font-weight: bold; letter-spacing: 5px; color: #2563EB; background: #EFF6FF; padding: 10px 20px; border-radius: 8px;">
+              ${code}
+            </span>
+          </div>
+          <p style="color: #666; font-size: 14px;">This code expires in 1 hour.</p>
+        </div>
+      `,
+    };
 
-    // If you had nodemailer, you would send it here.
+    await transporter.sendMail(mailOptions);
 
-    res.json({
-      message: "Verification code sent (Check console)",
-      debugCode: code,
-    });
+    res.json({ message: "Verification code sent to your email!" });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error("Email Sending Error:", err);
+    res.status(500).json({ error: "Failed to send email. Try again later." });
   }
 });
 
-// --- NEW: VERIFY EMAIL CODE ---
+// --- VERIFY EMAIL CODE ---
 router.post("/verify-email", async (req, res) => {
   try {
     const token = req.headers.authorization?.split(" ")[1];
     const { code } = req.body;
 
     if (!token) return res.status(401).json({ message: "No token" });
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || "secret_key");
+    const decoded = jwt.verify(token, BETTER_AUTH_SECRET);
 
     const user = await User.findById(decoded.id);
     if (!user) return res.status(404).json({ message: "User not found" });
@@ -195,7 +223,7 @@ router.post("/verify-email", async (req, res) => {
   }
 });
 
-// --- REGISTER ---
+// --- REGISTER (Manual) ---
 router.post("/register", async (req, res) => {
   try {
     const {
@@ -228,15 +256,15 @@ router.post("/register", async (req, res) => {
       addressDetails: { ...addressDetails, number: doorNum },
       shegaId,
       role: "BUYER",
-      isEmailVerified: false,
+      isEmailVerified: false, // Explicitly false for manual register
     });
 
     const savedUser = await newUser.save();
-    const token = jwt.sign(
-      { id: savedUser._id },
-      process.env.JWT_SECRET || "secret_key",
-      { expiresIn: "7d" },
-    );
+
+    // Use Better Auth Secret
+    const token = jwt.sign({ id: savedUser._id }, BETTER_AUTH_SECRET, {
+      expiresIn: "7d",
+    });
 
     const { password: _, ...userData } = savedUser._doc;
     res.status(201).json({ token, user: userData });
@@ -258,11 +286,9 @@ router.post("/login", async (req, res) => {
     if (!isMatch)
       return res.status(400).json({ message: "Invalid credentials" });
 
-    const token = jwt.sign(
-      { id: user._id },
-      process.env.JWT_SECRET || "secret_key",
-      { expiresIn: "7d" },
-    );
+    const token = jwt.sign({ id: user._id }, BETTER_AUTH_SECRET, {
+      expiresIn: "7d",
+    });
     const { password: _, ...userData } = user._doc;
     res.json({ token, user: userData });
   } catch (err) {
