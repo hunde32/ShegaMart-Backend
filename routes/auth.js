@@ -6,15 +6,14 @@ const User = require("../models/User");
 const nodemailer = require("nodemailer");
 
 // --- CONFIGURATION ---
-const BETTER_AUTH_SECRET =
-  process.env.BETTER_AUTH_SECRET || "pJdsPPPn4DFx4frQfG28fiUXwB6LnIuG";
+const BETTER_AUTH_SECRET = process.env.BETTER_AUTH_SECRET;
 
 // --- NODEMAILER CONFIGURATION ---
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
-    user: "shegamart.com@gmail.com",
-    pass: "vsem jmoo xeez jwqr",
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
   },
 });
 
