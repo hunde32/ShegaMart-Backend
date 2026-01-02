@@ -15,6 +15,15 @@ const deliverySchema = new mongoose.Schema(
       lng: Number,
       address: String,
     },
+    // ADDED: Store the items being delivered
+    items: [
+      {
+        title: String,
+        quantity: Number,
+        price: Number,
+        imageUrl: String,
+      },
+    ],
     status: {
       type: String,
       enum: ["OPEN", "ASSIGNED", "IN_PROGRESS", "DELIVERED", "CANCELLED"],

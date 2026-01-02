@@ -6,7 +6,9 @@ const User = require("../models/User");
 // CHECKOUT LOGIC (No Auto-Assign)
 router.post("/checkout", async (req, res) => {
   try {
-    const { userId, userName, userPhone, location, totalAmount } = req.body;
+    // 1. Added cartItems to destructuring
+    const { userId, userName, userPhone, location, totalAmount, cartItems } =
+      req.body;
 
     if (!userId || !location) {
       return res.status(400).json({ error: "Missing user or location data" });
@@ -31,6 +33,15 @@ router.post("/checkout", async (req, res) => {
         lng: location.lng,
         address: "Customer Location",
       },
+      // 2. Map the cart items to the schema
+      items: cartItems
+        ? cartItems.map((item) => ({
+            title: item.title,
+            quantity: item.quantity,
+            price: item.price,
+            imageUrl: item.imageUrl,
+          }))
+        : [],
       payout: driverPayout,
       status: "OPEN",
       type: "GIG", // Default to Gig, but visible to all
