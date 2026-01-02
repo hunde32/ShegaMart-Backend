@@ -104,6 +104,24 @@ router.post("/check-access", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+router.post("/check-access", async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.json({ isAdmin: false });
+
+    // Check if this email exists in the Admin collection
+    const admin = await Admin.findOne({ email });
+
+    if (admin) {
+      return res.json({ isAdmin: true });
+    } else {
+      return res.json({ isAdmin: false });
+    }
+  } catch (err) {
+    console.error("Access Check Error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
 // 3. Approve/Reject Driver
 router.post("/drivers/verify", verifyAdmin, async (req, res) => {
   try {
